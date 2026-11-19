@@ -72,3 +72,7 @@ lib/db.js                penyimpanan hasil di IndexedDB
 lib/pdf.js               pembuat PDF tanpa library eksternal
 icons/
 ```
+
+## Lisensi
+
+[MIT](LICENSE)
