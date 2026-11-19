@@ -1,7 +1,7 @@
 // Disuntikkan ke halaman saat "Tangkap seluruh halaman".
 // Menyediakan window.__fullsnap: prepare() → loadMore() (opsional) → measure() → scrollTo() berulang → restore().
 (() => {
-  const VERSION = 7;
+  const VERSION = 8;
   if (window.__fullsnap) {
     if (window.__fullsnap.version === VERSION) return;
     // Sisa versi lama (ekstensi baru diperbarui): pulihkan halaman lalu ganti.
@@ -231,17 +231,65 @@
     const h = bottom - top;
     const fys = edge === 'top' ? [0.06, 0.15, 0.3, 0.5, 0.7] : [0.94, 0.85, 0.7, 0.5, 0.3];
     const fxs = [0.5, 0.3, 0.7, 0.12, 0.88];
+    // Utamakan penanda yang isinya unik (teks/gambar), supaya tetap bisa ditemukan walau aplikasi
+    // memakai ulang elemen untuk pesan lain saat digulir (daftar virtual: Telegram, Discord, Slack…).
+    let fallback = null;
+    let checks = 0;
     for (const fy of fys) {
       for (const fx of fxs) {
         for (const c of document.elementsFromPoint(left + (right - left) * fx, top + h * fy)) {
           if (c === el || c === document.body || c === document.documentElement) continue;
           if (el && !el.contains(c)) continue;
           if (c.getBoundingClientRect().height > h * 1.5) continue;
-          if (movesWithContent(c)) return c;
+          if (!movesWithContent(c)) continue;
+          if (!fallback) fallback = c;
+          const sig = signature(c);
+          if (sig && checks++ < 12 && findBySignature(c.tagName, sig, 2).length === 1) return { el: c, sig };
         }
       }
     }
+    return fallback ? { el: fallback, sig: signature(fallback) } : null;
+  }
+
+  // "Sidik" isi elemen: teks pendek atau sumber gambar. Elemen yang dipakai ulang untuk pesan lain
+  // akan punya sidik berbeda.
+  function signature(el) {
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text.length >= 4 && text.length <= 400) return 't:' + text;
+    const src = el.currentSrc || el.getAttribute('src');
+    if (src) return 's:' + src;
     return null;
+  }
+
+  function findBySignature(tag, sig, limit = Infinity) {
+    const out = [];
+    for (const e of (state.scroller || document.body).getElementsByTagName(tag)) {
+      if (signature(e) === sig) {
+        out.push(e);
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  }
+
+  // Seberapa jauh ISI bergeser sejak penanda dipilih (positif = isi bergeser ke bawah).
+  function anchorShift() {
+    const a = state.anchor;
+    if (a === undefined) return 0; // belum ada foto sebelumnya
+    const byScroll = -(currentY() - state.y0);
+    if (!a) return byScroll;
+    // Penanda masih ada dan isinya sama → ukur langsung.
+    if (a.el.isConnected && (!a.sig || signature(a.el) === a.sig)) return a.el.getBoundingClientRect().top - state.t0;
+    // Elemen dipakai ulang atau diganti → cari elemen yang sekarang menampilkan isi yang sama.
+    if (a.sig) {
+      let best = null;
+      for (const e of findBySignature(a.el.tagName, a.sig)) {
+        const shift = e.getBoundingClientRect().top - state.t0;
+        if (best === null || Math.abs(shift - byScroll) < Math.abs(best - byScroll)) best = shift;
+      }
+      if (best !== null) return best;
+    }
+    return byScroll;
   }
 
   window.__fullsnap = {
@@ -381,21 +429,16 @@
     // antara foto (gambar termuat, pesan lama disisipkan, daftar virtual) tetap terhitung.
     async freeze(edge, maxMove = 0) {
       const dir = edge === 'top' ? -1 : 1;
-      const measure = () => {
-        if (state.anchor && state.anchor.isConnected) return state.anchor.getBoundingClientRect().top - state.t0;
-        if (state.anchor !== undefined) return -(currentY() - state.y0);
-        return 0;
-      };
-      let moved = measure();
+      let moved = anchorShift();
       // Isi bergeser lebih dari satu layar sejak foto sebelumnya (mis. gambar memanjang setelah
       // digulir) → gulir mundur dulu agar tidak ada bagian yang terlewat.
       for (let i = 0; i < 3 && maxMove && Math.abs(moved) > maxMove + 2; i++) {
         scrollByY(-dir * (Math.abs(moved) - maxMove));
         await settle(false);
-        moved = measure();
+        moved = anchorShift();
       }
       state.anchor = pickAnchor(edge);
-      state.t0 = state.anchor ? state.anchor.getBoundingClientRect().top : 0;
+      state.t0 = state.anchor ? state.anchor.el.getBoundingClientRect().top : 0;
       state.y0 = currentY();
       return { ...position(dir), moved };
     },
@@ -403,10 +446,7 @@
     // Langkah 6: gulir satu layar ke atas (dir -1) atau ke bawah (dir 1).
     // Mengembalikan pergeseran isi sementara (positif = isi bergeser ke bawah).
     async scrollStep(dir, amount, hide) {
-      const moved = () =>
-        state.anchor && state.anchor.isConnected
-          ? state.anchor.getBoundingClientRect().top - state.t0
-          : -(currentY() - state.y0);
+      const moved = anchorShift;
       scrollByY(dir * amount);
       await settle(hide);
       let m = moved();

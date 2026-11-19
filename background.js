@@ -9,7 +9,7 @@ const MAX_CANVAS_AREA = 250_000_000;
 const MAX_TILES = 150;
 const PAGE_TIMEOUT_MS = 20000;
 // Harus sama dengan VERSION di content/page-helper.js.
-const HELPER_VERSION = 7;
+const HELPER_VERSION = 8;
 // Gulir awal untuk memuat konten "infinite scroll" / lazy-load sebelum menangkap.
 const DEFAULT_PRELOAD_SCROLLS = 7;
 const MAX_PRELOAD_SCROLLS = 50;
