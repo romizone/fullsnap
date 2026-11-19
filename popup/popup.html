@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>FullSnap</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="../icons/icon32.png" alt="" width="20" height="20" />
+    <h1>FullSnap</h1>
+    <span class="tag">Screenshot</span>
+  </header>
+
+  <ul id="menu" class="menu" role="menu">
+    <li class="row" data-mode="full">
+      <button class="main" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
+        <span class="label">Tangkap seluruh halaman</span>
+        <kbd>Alt+Shift+1</kbd>
+      </button>
+      <button class="more" aria-label="Pilihan lain untuk seluruh halaman" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </li>
+    <li class="row" data-mode="visible">
+      <button class="main" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20"/></svg>
+        <span class="label">Tangkap area terlihat</span>
+        <kbd>Alt+Shift+2</kbd>
+      </button>
+      <button class="more" aria-label="Pilihan lain untuk area terlihat" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </li>
+    <li class="row" data-mode="selection">
+      <button class="main" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M9 12h6M12 9v6"/></svg>
+        <span class="label">Tangkap area pilihan</span>
+        <kbd>Alt+Shift+3</kbd>
+      </button>
+      <button class="more" aria-label="Pilihan lain untuk area pilihan" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </li>
+  </ul>
+
+  <!-- Sub-menu "lalu…" dipindah ke bawah baris yang dibuka -->
+  <div id="submenu" class="submenu" hidden>
+    <p class="sub-title">…lalu</p>
+    <div class="chips">
+      <button data-after="edit"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>Edit</button>
+      <button data-after="image"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Simpan gambar</button>
+      <button data-after="pdf"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 17h5"/></svg>Simpan PDF</button>
+      <button data-after="copy"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>Salin</button>
+      <button data-after="print"><svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg>Cetak</button>
+    </div>
+  </div>
+
+  <section id="progress" hidden>
+    <p id="progress-text">Menyiapkan…</p>
+    <div class="bar"><div id="progress-fill"></div></div>
+    <p class="note">Jangan pindah tab sampai selesai.</p>
+    <button id="stop" class="stop" type="button" hidden>Berhenti &amp; simpan</button>
+  </section>
+
+  <p id="error" role="alert" hidden></p>
+
+  <hr />
+
+  <ul class="menu secondary">
+    <li>
+      <button id="open-last" class="item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+        <span class="label">Buka tangkapan terakhir</span>
+      </button>
+    </li>
+    <li>
+      <label class="item setting">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span class="label">Aksi default</span>
+        <select id="default-after">
+          <option value="edit">Edit</option>
+          <option value="image">Simpan gambar</option>
+          <option value="pdf">Simpan PDF</option>
+          <option value="copy">Salin</option>
+          <option value="print">Cetak</option>
+        </select>
+      </label>
+    </li>
+    <li>
+      <label class="item setting" title="Untuk halaman yang memuat konten baru saat digulir (infinite scroll)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v14M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>
+        <span class="label">Gulir dulu (muat konten)</span>
+        <select id="preload-scrolls">
+          <option value="0">Mati</option>
+          <option value="3">3×</option>
+          <option value="7">7×</option>
+          <option value="15">15×</option>
+          <option value="30">30×</option>
+        </select>
+      </label>
+    </li>
+    <li>
+      <button id="shortcuts" class="item">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+        <span class="label">Atur shortcut keyboard</span>
+      </button>
+    </li>
+  </ul>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

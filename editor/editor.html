@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FullSnap</title>
+  <link rel="icon" href="../icons/icon32.png" />
+  <link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="group tools" role="toolbar" aria-label="Alat">
+      <button class="tool active" data-tool="hand" title="Geser (V)">
+        <svg viewBox="0 0 24 24"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V10m0-5.5v-1a1.5 1.5 0 0 1 3 0V10m0-4.5a1.5 1.5 0 0 1 3 0V12m0-3.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.6-2.2L4.2 15.5a1.6 1.6 0 0 1 2.4-2.1L8 15"/></svg>
+      </button>
+      <button class="tool" data-tool="crop" title="Potong (C)">
+        <svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      </button>
+      <span class="sep"></span>
+      <button class="tool" data-tool="rect" title="Kotak (R)">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/></svg>
+      </button>
+      <button class="tool" data-tool="ellipse" title="Elips (O)">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7"/></svg>
+      </button>
+      <button class="tool" data-tool="arrow" title="Panah (A)">
+        <svg viewBox="0 0 24 24"><path d="M5 19 19 5M10 5h9v9"/></svg>
+      </button>
+      <button class="tool" data-tool="pen" title="Pena (P)">
+        <svg viewBox="0 0 24 24"><path d="M3 21c3-1 4-4 7-7l7-7a2.1 2.1 0 0 1 3 3l-7 7c-3 3-6 4-7 7"/></svg>
+      </button>
+      <button class="tool" data-tool="highlight" title="Stabilo (H)">
+        <svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+      </button>
+      <button class="tool" data-tool="text" title="Teks (T)">
+        <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>
+      </button>
+      <button class="tool" data-tool="step" title="Nomor langkah (N) – klik untuk menaruh 1, 2, 3…">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10.5 9 12.5 7.5V16.5"/></svg>
+      </button>
+      <button class="tool" data-tool="blur" title="Sensor / buramkan (B)">
+        <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM12 4h4v4h-4zM8 8h4v4H8zM16 8h4v4h-4zM4 12h4v4H4zM12 12h4v4h-4zM8 16h4v4H8zM16 16h4v4h-4z"/></svg>
+      </button>
+    </div>
+
+    <div class="group">
+      <label class="color" title="Warna">
+        <input type="color" id="color" value="#ef4444" />
+      </label>
+      <select id="size" title="Ketebalan">
+        <option value="2">Tipis</option>
+        <option value="4" selected>Sedang</option>
+        <option value="7">Tebal</option>
+        <option value="12">Sangat tebal</option>
+      </select>
+      <button id="undo" class="icon" title="Urungkan (Ctrl+Z)" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button id="redo" class="icon" title="Ulangi (Ctrl+Shift+Z)" disabled>
+        <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+      </button>
+    </div>
+
+    <div class="group">
+      <button id="zoom-out" class="icon" title="Perkecil">−</button>
+      <button id="zoom-label" class="zoom-label" title="Klik: pas lebar / 100%">100%</button>
+      <button id="zoom-in" class="icon" title="Perbesar">+</button>
+    </div>
+
+  </header>
+
+  <!-- Tombol aksi besar: simpan gambar, simpan PDF, salin, cetak -->
+  <nav class="actionbar" aria-label="Aksi">
+    <div class="split">
+      <button class="big primary" data-save="png" title="Simpan sebagai PNG (Ctrl+S)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+        <span>Simpan gambar</span>
+      </button>
+      <button class="big primary caret" data-menu="image-menu" aria-haspopup="menu" aria-expanded="false" title="Format gambar">▾</button>
+      <div id="image-menu" class="menu" role="menu" hidden>
+        <button role="menuitem" data-save="png">PNG <small>kualitas penuh</small></button>
+        <button role="menuitem" data-save="jpg">JPG <small>ukuran lebih kecil</small></button>
+      </div>
+    </div>
+
+    <div class="split">
+      <button class="big" data-save="pdf-a4" title="Simpan sebagai PDF (A4)">
+        <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 17h5"/></svg>
+        <span>Simpan PDF</span>
+      </button>
+      <button class="big caret" data-menu="pdf-menu" aria-haspopup="menu" aria-expanded="false" title="Ukuran kertas PDF">▾</button>
+      <div id="pdf-menu" class="menu" role="menu" hidden>
+        <button role="menuitem" data-save="pdf-a4">Kertas A4</button>
+        <button role="menuitem" data-save="pdf-letter">Kertas Letter</button>
+        <button role="menuitem" data-save="pdf-single">Satu halaman panjang</button>
+      </div>
+    </div>
+
+    <button id="copy" class="big" title="Salin ke clipboard (Ctrl+C)">
+      <svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+      <span>Salin</span>
+    </button>
+    <button id="print" class="big" title="Cetak (Ctrl+P)">
+      <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg>
+      <span>Cetak</span>
+    </button>
+
+    <label class="check"><input type="checkbox" id="ask-location" /> Tanya lokasi penyimpanan</label>
+  </nav>
+
+  <div class="infobar">
+    <a id="page-link" target="_blank" rel="noopener"></a>
+    <span id="dims"></span>
+    <span id="notice"></span>
+  </div>
+
+  <main id="stage" class="tool-hand">
+    <div id="wrap">
+      <canvas id="canvas"></canvas>
+      <svg id="overlay" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none"></svg>
+      <textarea id="text-input" rows="1" spellcheck="false" hidden></textarea>
+    </div>
+    <p id="status" class="status">Memuat tangkapan…</p>
+  </main>
+
+  <div id="crop-bar" class="floating-bar" hidden>
+    <span id="crop-size"></span>
+    <button id="crop-apply" class="primary">Potong (Enter)</button>
+    <button id="crop-cancel">Batal (Esc)</button>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="print-area"></div>
+
+  <script type="module" src="editor.js"></script>
+</body>
+</html>
