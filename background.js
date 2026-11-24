@@ -2,14 +2,15 @@ import { putCapture } from './lib/db.js';
 
 // Chrome membatasi captureVisibleTab ± 2 kali per detik.
 const CAPTURE_INTERVAL_MS = 550;
-// Batas aman ukuran canvas Chrome.
+// Batas aman ukuran canvas Chrome. Batas luas dijaga jauh di bawah batas Chrome (±268 jt piksel):
+// gambar disusun di service worker lalu dimuat ulang di editor, dan tiap salinan memakai 4 byte/piksel.
 const MAX_CANVAS_DIM = 32000;
-const MAX_CANVAS_AREA = 250_000_000;
+const MAX_CANVAS_AREA = 120_000_000;
 // Batas jumlah potongan layar agar halaman "infinite scroll" tidak berjalan selamanya.
 const MAX_TILES = 150;
 const PAGE_TIMEOUT_MS = 20000;
 // Harus sama dengan VERSION di content/page-helper.js.
-const HELPER_VERSION = 8;
+const HELPER_VERSION = 9;
 // Gulir awal untuk memuat konten "infinite scroll" / lazy-load sebelum menangkap.
 const DEFAULT_PRELOAD_SCROLLS = 7;
 const MAX_PRELOAD_SCROLLS = 50;
@@ -202,45 +203,58 @@ async function captureFullPage(tab) {
     // Halaman biasa: header fixed tetap tampil sekali di potongan pertama.
     if (info.mode === 'element' || bottomFirst) await runInPage(tab.id, () => window.__fullsnap.hideOverlays());
 
-    for (let row = 0; ; row++) {
-      let atEnd = false;
-      for (let i = 0; i < xs.length; i++) {
-        if (xs.length > 1 && i > 0) await runInPage(tab.id, (px) => window.__fullsnap.setX(px), [xs[i]]);
-        await waitCaptureSlot();
-        // Ukur posisi tepat sebelum foto (hanya pada kolom pertama tiap baris).
-        const f =
-          i === 0 ? await runInPage(tab.id, (e, max) => window.__fullsnap.freeze(e, max), [edge, row > 0 ? region.h : 0]) : null;
-        if (f) {
-          if (row > 0) rowY -= f.moved;
-          atEnd = f.atEnd;
+    // Galat di tengah jalan (tab berpindah, halaman dimuat ulang/tidak merespons): susun bagian
+    // yang sudah ditangkap alih-alih membuang semuanya.
+    let failed = null;
+    let completeTiles = 0; // jumlah potongan sampai baris lengkap terakhir
+    try {
+      for (let row = 0; ; row++) {
+        let atEnd = false;
+        for (let i = 0; i < xs.length; i++) {
+          if (xs.length > 1 && i > 0) await runInPage(tab.id, (px) => window.__fullsnap.setX(px), [xs[i]]);
+          await waitCaptureSlot();
+          // Ukur posisi tepat sebelum foto (hanya pada kolom pertama tiap baris).
+          const f =
+            i === 0 ? await runInPage(tab.id, (e, max) => window.__fullsnap.freeze(e, max), [edge, row > 0 ? region.h : 0]) : null;
+          if (i === 0 && !f) throw new Error('Halaman berubah atau dimuat ulang saat ditangkap.');
+          if (f) {
+            if (row > 0) rowY -= f.moved;
+            atEnd = f.atEnd;
+          }
+          const x = xs.length > 1 ? xs[i] : f.x;
+          const blob = await (await fetch(await grabTab(tab))).blob();
+          tiles.push({ blob, x: x + region.offX, y: rowY + region.offY });
+          const done = tiles.length;
+          setBadge(tab.id, `${Math.min(99, Math.round((done / Math.max(done, estTotal)) * 100))}%`);
+          broadcast({ type: 'fullsnap-progress', phase: 'capture', done, total: Math.max(done, estTotal) });
         }
-        const x = xs.length > 1 ? xs[i] : f.x;
-        const blob = await (await fetch(await grabTab(tab))).blob();
-        tiles.push({ blob, x: x + region.offX, y: rowY + region.offY });
-        const done = tiles.length;
-        setBadge(tab.id, `${Math.min(99, Math.round((done / Math.max(done, estTotal)) * 100))}%`);
-        broadcast({ type: 'fullsnap-progress', phase: 'capture', done, total: Math.max(done, estTotal) });
+        completeTiles = tiles.length;
+        // Dihentikan pengguna: berhenti di akhir baris agar tidak ada kolom yang kosong.
+        if (stopRequested && !atEnd) {
+          stopped = true;
+          break;
+        }
+        // Berhenti di ujung halaman. Batas cadangan 1,3× tinggi terukur: konten bisa memanjang saat
+        // ditangkap (gambar termuat), tapi halaman yang terus memuat konten baru tidak boleh tanpa akhir.
+        const covered = Math.abs(rowY) + region.h;
+        if (atEnd || covered >= info.totalHeight * 1.3) break;
+        if (tiles.length + xs.length > MAX_TILES) {
+          truncated = true;
+          break;
+        }
+        if (xs.length > 1) await runInPage(tab.id, (px) => window.__fullsnap.setX(px), [xs[0]]);
+        const next = await runInPage(
+          tab.id,
+          (d, amount, hide) => window.__fullsnap.scrollStep(d, amount, hide),
+          [dir, region.h, true]
+        );
+        if (!next || Math.abs(next.moved) < 1) break; // tidak bisa bergulir lagi
       }
-      // Dihentikan pengguna: berhenti di akhir baris agar tidak ada kolom yang kosong.
-      if (stopRequested && !atEnd) {
-        stopped = true;
-        break;
-      }
-      // Berhenti di ujung halaman. Batas cadangan 1,3× tinggi terukur: konten bisa memanjang saat
-      // ditangkap (gambar termuat), tapi halaman yang terus memuat konten baru tidak boleh tanpa akhir.
-      const covered = Math.abs(rowY) + region.h;
-      if (atEnd || covered >= info.totalHeight * 1.3) break;
-      if (tiles.length + xs.length > MAX_TILES) {
-        truncated = true;
-        break;
-      }
-      if (xs.length > 1) await runInPage(tab.id, (px) => window.__fullsnap.setX(px), [xs[0]]);
-      const next = await runInPage(
-        tab.id,
-        (d, amount, hide) => window.__fullsnap.scrollStep(d, amount, hide),
-        [dir, region.h, true]
-      );
-      if (!next || Math.abs(next.moved) < 1) break; // tidak bisa bergulir lagi
+    } catch (err) {
+      if (xs.length > 1) tiles.length = completeTiles; // buang baris yang kolomnya belum lengkap
+      if (!tiles.length) throw err;
+      failed = friendlyError(err);
+      console.warn('[FullSnap] Tangkapan terputus, menyusun bagian yang sudah ada:', err);
     }
 
     // Susun gambar akhir.
@@ -275,7 +289,7 @@ async function captureFullPage(tab) {
       t.blob = null;
     }
 
-    return makeRecord(tab, canvas, 'full', scale * fit, { truncated, stopped, downscaled: fit < 1 });
+    return makeRecord(tab, canvas, 'full', scale * fit, { truncated, stopped, failed, downscaled: fit < 1 });
   } finally {
     await runInPage(tab.id, () => window.__fullsnap && window.__fullsnap.restore()).catch(() => {});
   }

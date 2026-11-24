@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FullSnap – Screenshot Seluruh Halaman",
   "short_name": "FullSnap",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Tangkap seluruh halaman web, area terlihat, atau area pilihan. Edit, beri anotasi, lalu simpan ke PNG, JPG, PDF, atau salin ke clipboard.",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus", "downloads", "notifications", "clipboardWrite"],
   "background": {

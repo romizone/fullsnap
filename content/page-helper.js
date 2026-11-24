@@ -1,7 +1,7 @@
 // Disuntikkan ke halaman saat "Tangkap seluruh halaman".
 // Menyediakan window.__fullsnap: prepare() → loadMore() (opsional) → measure() → scrollTo() berulang → restore().
 (() => {
-  const VERSION = 8;
+  const VERSION = 9;
   if (window.__fullsnap) {
     if (window.__fullsnap.version === VERSION) return;
     // Sisa versi lama (ekstensi baru diperbarui): pulihkan halaman lalu ganti.
@@ -235,6 +235,7 @@
     // memakai ulang elemen untuk pesan lain saat digulir (daftar virtual: Telegram, Discord, Slack…).
     let fallback = null;
     let checks = 0;
+    const pools = new Map(); // DOM tidak berubah selama fungsi ini berjalan → daftar kandidat dipakai ulang
     for (const fy of fys) {
       for (const fx of fxs) {
         for (const c of document.elementsFromPoint(left + (right - left) * fx, top + h * fy)) {
@@ -244,7 +245,7 @@
           if (!movesWithContent(c)) continue;
           if (!fallback) fallback = c;
           const sig = signature(c);
-          if (sig && checks++ < 12 && findBySignature(c.tagName, sig, 2).length === 1) return { el: c, sig };
+          if (sig && checks++ < 12 && findBySignature(c.tagName, sig, 2, pools).length === 1) return { el: c, sig };
         }
       }
     }
@@ -253,17 +254,49 @@
 
   // "Sidik" isi elemen: teks pendek atau sumber gambar. Elemen yang dipakai ulang untuk pesan lain
   // akan punya sidik berbeda.
+  const MAX_SIG_TEXT = 400;
+
   function signature(el) {
     const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-    if (text.length >= 4 && text.length <= 400) return 't:' + text;
+    if (text.length >= 4 && text.length <= MAX_SIG_TEXT) return 't:' + text;
     const src = el.currentSrc || el.getAttribute('src');
     if (src) return 's:' + src;
     return null;
   }
 
-  function findBySignature(tag, sig, limit = Infinity) {
+  // Elemen bertag `tag` yang teksnya cukup pendek untuk punya sidik teks. Dihitung dalam satu kali
+  // lintas DOM: memanggil textContent pada setiap elemen akan membangun ulang teks seluruh halaman
+  // untuk tiap pembungkus besar (sangat lambat di Gmail/Slack). Jumlah karakter non-spasi tidak
+  // pernah melebihi panjang teks yang sudah dirapikan, jadi elemen yang dibuang pasti tidak cocok.
+  function shortTextElements(root, tag) {
     const out = [];
-    for (const e of (state.scroller || document.body).getElementsByTagName(tag)) {
+    const visit = (node) => {
+      let n = 0;
+      for (let c = node.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 1) n += visit(c);
+        else if (c.nodeType === 3 || c.nodeType === 4) n += c.data.length - (c.data.match(/\s/g)?.length || 0);
+      }
+      if (n <= MAX_SIG_TEXT && node.tagName === tag) out.push(node);
+      return n;
+    };
+    for (let c = root.firstElementChild; c; c = c.nextElementSibling) visit(c);
+    return out;
+  }
+
+  function findBySignature(tag, sig, limit = Infinity, pools = null) {
+    const root = state.scroller || document.body;
+    let pool;
+    if (sig.startsWith('s:')) {
+      pool = root.getElementsByTagName(tag); // sidik gambar: tidak perlu menghitung teks pembungkus
+    } else {
+      pool = pools?.get(tag);
+      if (!pool) {
+        pool = shortTextElements(root, tag);
+        pools?.set(tag, pool);
+      }
+    }
+    const out = [];
+    for (const e of pool) {
       if (signature(e) === sig) {
         out.push(e);
         if (out.length >= limit) break;
