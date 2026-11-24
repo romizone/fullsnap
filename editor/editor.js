@@ -59,6 +59,7 @@ async function init() {
   const notes = [];
   if (meta.truncated) notes.push('Halaman sangat panjang – hanya sebagian yang ditangkap.');
   if (meta.stopped) notes.push('Penangkapan dihentikan – hanya bagian yang sudah ditangkap.');
+  if (meta.failed) notes.push(`Penangkapan terputus (${meta.failed}) – hanya bagian yang sudah ditangkap.`);
   if (meta.downscaled) notes.push('Gambar diperkecil agar muat batas ukuran browser.');
   $('notice').textContent = notes.join(' ');
 
